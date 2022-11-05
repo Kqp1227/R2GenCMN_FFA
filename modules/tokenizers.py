@@ -19,7 +19,7 @@ class Tokenizer(object):
             self.token2idx, self.idx2token = self.create_vocabulary()
         elif self.dataset_name == 'FFA_IR':
             self.clean_report = self.clean_report_fair
-            self.ann = pd.read_csv(self.ann_path)
+            self.ann = json.loads(open(self.ann_path, 'r').read())
             self.token2idx, self.idx2token = self.create_vocabulary()
 
     def create_vocabulary(self):
@@ -31,12 +31,11 @@ class Tokenizer(object):
                     total_tokens.append(token)
         else:
             for example in self.ann['train']:
-                tokens = self.clean_report_fair(example['En_Report']).split()
+                tokens = self.ann['train'][example]['En_Report'].split()
             # for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
             #     tokens = self.clean_report_fair(report).split()
                 for token in tokens:
                     total_tokens.append(token)
-
         counter = Counter(total_tokens)
         vocab = [k for k, v in counter.items() if v >= self.threshold] + ['<unk>']
         vocab.sort()
