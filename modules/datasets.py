@@ -16,9 +16,11 @@ class BaseDataset(Dataset):
         self.transform = transform
         self.ann = json.loads(open(self.ann_path, 'r').read())
         self.examples = self.ann[self.split]
-        for i in range(len(self.examples)):
-            self.examples[i]['ids'] = tokenizer(self.examples[i]['report'])[:self.max_seq_length]
-            self.examples[i]['mask'] = [1] * len(self.examples[i]['ids'])
+        self.masks = []
+        self.reports = []
+        # for i in range(len(self.examples)):
+        #     self.examples[i]['ids'] = tokenizer(self.examples[i]['report'])[:self.max_seq_length]
+        #     self.examples[i]['mask'] = [1] * len(self.examples[i]['ids'])
 
     def __len__(self):
         return len(self.examples)
@@ -26,6 +28,9 @@ class BaseDataset(Dataset):
 
 class IuxrayMultiImageDataset(BaseDataset):
     def __getitem__(self, idx):
+        for i in range(len(self.examples)):
+            self.examples[i]['ids'] = self.tokenizer(self.examples[i]['report'])[:self.max_seq_length]
+            self.examples[i]['mask'] = [1] * len(self.examples[i]['ids'])
         example = self.examples[idx]
         image_id = example['id']
         image_path = example['image_path']
@@ -44,6 +49,9 @@ class IuxrayMultiImageDataset(BaseDataset):
 
 class MimiccxrSingleImageDataset(BaseDataset):
     def __getitem__(self, idx):
+        for i in range(len(self.examples)):
+            self.examples[i]['ids'] = self.tokenizer(self.examples[i]['report'])[:self.max_seq_length]
+            self.examples[i]['mask'] = [1] * len(self.examples[i]['ids'])
         example = self.examples[idx]
         image_id = example['id']
         image_path = example['image_path']
@@ -59,7 +67,12 @@ class MimiccxrSingleImageDataset(BaseDataset):
 
 class FFAIRDataset(BaseDataset):
     def __getitem__(self, idx):
+        for each in self.examples.keys():
+            self.reports.append(self.examples[each]['En_Report'][:self.max_seq_length])
+            self.masks.append([1]*len(self.reports[-1]))
         case_ids = self.examples.keys()
+        # print(case_ids)
+        print(idx)
         case_id = case_ids[idx]
         image_id = case_id
         image_path = eval(self.examples['Image_path'])
@@ -71,6 +84,7 @@ class FFAIRDataset(BaseDataset):
         images = torch.stack(images, 0)
         report_ids = self.reports[idx]
         report_masks = self.masks[idx]
+
         seq_length = len(report_ids)
         sample = (image_id, images, report_ids, report_masks, seq_length)
         return sample

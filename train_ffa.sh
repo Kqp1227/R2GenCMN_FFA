@@ -1,6 +1,6 @@
 python main_train.py\
-    --image_dir H:\ffa-ir-towards-an-explainable-and-reliable-medical-report-generation-benchmark-1.0.0\FFAIR \
-    --ann_path "H:\ffa-ir-towards-an-explainable-and-reliable-medical-report-generation-benchmark-1.0.0\ffair_annotation.json" \
+    --image_dir "H:\FFA-IR\FFAIR" \
+    --ann_path "H:\FFA-IR\ffair_annotation.json" \
     --dataset_name FFA_IR \
     --max_seq_length 60 \
     --threshold 3 \

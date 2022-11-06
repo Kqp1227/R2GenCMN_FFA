@@ -1,7 +1,10 @@
 import logging
 import os
+import json
+import time
+import pandas as pd
 from abc import abstractmethod
-
+from torch.utils.tensorboard import SummaryWriter
 import torch
 from numpy import inf
 
@@ -48,23 +51,36 @@ class BaseTrainer(object):
         if args.resume is not None:
             self._resume_checkpoint(args.resume)
 
+        self.best_recorder = {'val': {self.mnt_metric: self.mnt_best},
+                              'test': {self.mnt_metric_test: self.mnt_best}}
+
     @abstractmethod
     def _train_epoch(self, epoch):
         raise NotImplementedError
 
     def train(self):
+        # record all the val
+        record_json = {}
         not_improved_count = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
-            result = self._train_epoch(epoch)
+            # result = self._train_epoch(epoch)
+            result, test_gts, test_res = self._train_epoch(epoch)
+
+            # save outputs each epoch
+            save_outputs = {'gts': test_gts, 'res': test_res}
+            with open(os.path.join('records', str(epoch)+'_token_results.json'), 'w') as f:
+                json.dump(save_outputs, f)
 
             # save logged informations into log dict
             log = {'epoch': epoch}
             log.update(result)
             self._record_best(log)
+            record_json[epoch] = log
 
             # print logged informations to the screen
             for key, value in log.items():
                 self.logger.info('\t{:15s}: {}'.format(str(key), value))
+                print('\t{:15s}: {}'.format(str(key), value))
 
             # evaluate model performance according to configured metric, save best checkpoint as model_best
             best = False
@@ -74,6 +90,8 @@ class BaseTrainer(object):
                     improved = (self.mnt_mode == 'min' and log[self.mnt_metric] <= self.mnt_best) or \
                                (self.mnt_mode == 'max' and log[self.mnt_metric] >= self.mnt_best)
                 except KeyError:
+                    print("Warning: Metric '{}' is not found. " "Model performance monitoring is disabled.".format(
+                        self.mnt_metric))
                     self.logger.warning(
                         "Warning: Metric '{}' is not found. " "Model performance monitoring is disabled.".format(
                             self.mnt_metric))
@@ -84,16 +102,51 @@ class BaseTrainer(object):
                     self.mnt_best = log[self.mnt_metric]
                     not_improved_count = 0
                     best = True
+                    save_outputs = {'gts': test_gts, 'res': test_res}
+                    with open(os.path.join('records', 'best_word_results.json'), 'w') as f:
+                        json.dump(save_outputs, f)
                 else:
                     not_improved_count += 1
 
                 if not_improved_count > self.early_stop:
+                    print("Validation performance didn\'t improve for {} epochs. " "Training stops.".format(
+                        self.early_stop))
                     self.logger.info("Validation performance didn\'t improve for {} epochs. " "Training stops.".format(
                         self.early_stop))
                     break
 
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=best)
+        self._print_best()
+        self._print_best_to_file()
+        self._save_file(record_json)
+
+    def _save_file(self, log):
+        if not os.path.exists(self.args.record_dir):
+            os.mkdir(self.args.record_dir)
+        record_path = os.path.join(self.args.record_dir, self.args.dataset_name + '.json')
+        with open(record_path, 'w') as f:
+            json.dump(log, f)
+
+    def _print_best_to_file(self):
+        crt_time = time.asctime(time.localtime(time.time()))
+        self.best_recorder['val']['time'] = crt_time
+        self.best_recorder['test']['time'] = crt_time
+        self.best_recorder['val']['seed'] = self.args.seed
+        self.best_recorder['test']['seed'] = self.args.seed
+        self.best_recorder['val']['best_model_from'] = 'val'
+        self.best_recorder['test']['best_model_from'] = 'test'
+
+        if not os.path.exists(self.args.record_dir):
+            os.makedirs(self.args.record_dir)
+        record_path = os.path.join(self.args.record_dir, self.args.dataset_name+'.csv')
+        if not os.path.exists(record_path):
+            record_table = pd.DataFrame()
+        else:
+            record_table = pd.read_csv(record_path)
+        record_table = record_table.append(self.best_recorder['val'], ignore_index=True)
+        record_table = record_table.append(self.best_recorder['test'], ignore_index=True)
+        record_table.to_csv(record_path, index=False)
 
     def _record_best(self, log):
         improved_val = (self.mnt_mode == 'min' and log[self.mnt_metric] <= self.best_recorder['val'][
@@ -167,26 +220,33 @@ class Trainer(BaseTrainer):
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.test_dataloader = test_dataloader
+        ## check the training
+        self.writer = SummaryWriter()
 
     def _train_epoch(self, epoch):
 
         self.logger.info('[{}/{}] Start to train in the training set.'.format(epoch, self.epochs))
         train_loss = 0
+        print_loss = 0
         self.model.train()
         for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.train_dataloader):
 
-            images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(self.device), \
-                                                 reports_masks.to(self.device)
+            # images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(self.device), \
+            #                                      reports_masks.to(self.device)
+            images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(self.device), reports_masks.to(
+                self.device)
             output = self.model(images, reports_ids, mode='train')
             loss = self.criterion(output, reports_ids, reports_masks)
             train_loss += loss.item()
             self.optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_value_(self.model.parameters(), 0.1)
             self.optimizer.step()
             if batch_idx % self.args.log_period == 0:
                 self.logger.info('[{}/{}] Step: {}/{}, Training Loss: {:.5f}.'
                                  .format(epoch, self.epochs, batch_idx, len(self.train_dataloader),
                                          train_loss / (batch_idx + 1)))
+                print_loss = 0
 
         log = {'train_loss': train_loss / len(self.train_dataloader)}
 
@@ -209,6 +269,14 @@ class Trainer(BaseTrainer):
             log.update(**{'val_' + k: v for k, v in val_met.items()})
 
         self.logger.info('[{}/{}] Start to evaluate in the test set.'.format(epoch, self.epochs))
+        self.writer.add_scalar("data/b1/val", val_met['BLEU_1'], epoch)
+        self.writer.add_scalar("data/b2/val", val_met['BLEU_2'], epoch)
+        self.writer.add_scalar("data/b3/val", val_met['BLEU_3'], epoch)
+        self.writer.add_scalar("data/b4/val", val_met['BLEU_4'], epoch)
+        self.writer.add_scalar("data/met/val", val_met['METEOR'], epoch)
+        self.writer.add_scalar("data/rou/val", val_met['ROUGE_L'], epoch)
+        self.writer.add_scalar("data/cid/val", val_met['CIDER'], epoch)
+
         self.model.eval()
         with torch.no_grad():
             test_gts, test_res = [], []
@@ -224,7 +292,15 @@ class Trainer(BaseTrainer):
             test_met = self.metric_ftns({i: [gt] for i, gt in enumerate(test_gts)},
                                         {i: [re] for i, re in enumerate(test_res)})
             log.update(**{'test_' + k: v for k, v in test_met.items()})
+        self.writer.add_scalar("data/b1/test", test_met['BLEU_1'], epoch)
+        self.writer.add_scalar("data/b2/test", test_met['BLEU_2'], epoch)
+        self.writer.add_scalar("data/b3/test", test_met['BLEU_3'], epoch)
+        self.writer.add_scalar("data/b4/test", test_met['BLEU_4'], epoch)
+        self.writer.add_scalar("data/met/test", test_met['METEOR'], epoch)
+        self.writer.add_scalar("data/rou/test", test_met['ROUGE_L'], epoch)
+        self.writer.add_scalar("data/cid/test", test_met['CIDER'], epoch)
 
         self.lr_scheduler.step()
+        self.writer.close()
 
-        return log
+        return log, test_gts, test_res
