@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from models.models import BaseCMNModel
-from modules.dataloaders import R2DataLoader
+from modules.dataloaders import FFAIRDataLoader
 from modules.loss import compute_loss
 from modules.metrics import compute_scores
 from modules.optimizers import build_optimizer, build_lr_scheduler
@@ -16,13 +16,13 @@ def parse_agrs():
     parser = argparse.ArgumentParser()
 
     # Data input settings
-    parser.add_argument('--image_dir', type=str, default='data/iu_xray/images/',
+    parser.add_argument('--image_dir', type=str, default="H:\FFA-IR\FFAIR",
                         help='the path to the directory containing the data.')
-    parser.add_argument('--ann_path', type=str, default='data/iu_xray/annotation.json',
+    parser.add_argument('--ann_path', type=str, default=r"H:\FFA-IR\ffair_annotation.json",
                         help='the path to the directory containing the data.')
 
     # Data loader settings
-    parser.add_argument('--dataset_name', type=str, default='iu_xray', choices=['iu_xray', 'mimic_cxr', 'FFA_IR'],
+    parser.add_argument('--dataset_name', type=str, default='FFA_IR', choices=['iu_xray', 'mimic_cxr', 'FFA_IR'],
                         help='the dataset to be used.')
     parser.add_argument('--max_seq_length', type=int, default=60, help='the maximum sequence length of the reports.')
     parser.add_argument('--threshold', type=int, default=3, help='the cut off frequency for the words.')
@@ -111,9 +111,9 @@ def main():
     tokenizer = Tokenizer(args)
 
     # create data loader
-    train_dataloader = R2DataLoader(args, tokenizer, split='train', shuffle=True)
-    val_dataloader = R2DataLoader(args, tokenizer, split='val', shuffle=False)
-    test_dataloader = R2DataLoader(args, tokenizer, split='test', shuffle=False)
+    train_dataloader = FFAIRDataLoader(args, tokenizer, split='train', shuffle=True)
+    val_dataloader = FFAIRDataLoader(args, tokenizer, split='val', shuffle=False)
+    test_dataloader = FFAIRDataLoader(args, tokenizer, split='test', shuffle=False)
 
     # build model architecture
     model = BaseCMNModel(args, tokenizer)

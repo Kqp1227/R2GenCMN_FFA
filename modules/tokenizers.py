@@ -1,7 +1,6 @@
-import json
+import pandas as pd
 import re
 from collections import Counter
-import pandas as pd
 
 
 class Tokenizer(object):
@@ -9,33 +8,18 @@ class Tokenizer(object):
         self.ann_path = args.ann_path
         self.threshold = args.threshold
         self.dataset_name = args.dataset_name
-        if self.dataset_name == 'iu_xray':
-            self.clean_report = self.clean_report_iu_xray
-            self.ann = json.loads(open(self.ann_path, 'r').read())
-            self.token2idx, self.idx2token = self.create_vocabulary()
-        elif self.dataset_name == 'mimic_cxr':
-            self.clean_report = self.clean_report_mimic_cxr
-            self.ann = json.loads(open(self.ann_path, 'r').read())
-            self.token2idx, self.idx2token = self.create_vocabulary()
-        elif self.dataset_name == 'FFA_IR':
-            self.clean_report = self.clean_report_fair
-            self.ann = json.loads(open(self.ann_path, 'r').read())
-            self.token2idx, self.idx2token = self.create_vocabulary()
+        self.clean_report = self.clean_report_fair
+        self.ann = pd.read_csv(self.ann_path)
+        self.token2idx, self.idx2token = self.create_vocabulary()
 
     def create_vocabulary(self):
         total_tokens = []
-        if self.dataset_name != "FFA_IR":
-            for example in self.ann['train']:
-                tokens = self.clean_report(example['report']).split()
-                for token in tokens:
-                    total_tokens.append(token)
-        else:
-            for example in self.ann['train']:
-                tokens = self.ann['train'][example]['En_Report'].split()
-            # for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
-            #     tokens = self.clean_report_fair(report).split()
-                for token in tokens:
-                    total_tokens.append(token)
+
+        for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
+            tokens = self.clean_report_fair(report).split()
+            for token in tokens:
+                total_tokens.append(token)
+
         counter = Counter(total_tokens)
         vocab = [k for k, v in counter.items() if v >= self.threshold] + ['<unk>']
         vocab.sort()
@@ -44,32 +28,6 @@ class Tokenizer(object):
             token2idx[token] = idx + 1
             idx2token[idx + 1] = token
         return token2idx, idx2token
-
-    def clean_report_iu_xray(self, report):
-        report_cleaner = lambda t: t.replace('..', '.').replace('..', '.').replace('..', '.').replace('1. ', '') \
-            .replace('. 2. ', '. ').replace('. 3. ', '. ').replace('. 4. ', '. ').replace('. 5. ', '. ') \
-            .replace(' 2. ', '. ').replace(' 3. ', '. ').replace(' 4. ', '. ').replace(' 5. ', '. ') \
-            .strip().lower().split('. ')
-        sent_cleaner = lambda t: re.sub('[.,?;*!%^&_+():-\[\]{}]', '', t.replace('"', '').replace('/', '').
-                                        replace('\\', '').replace("'", '').strip().lower())
-        tokens = [sent_cleaner(sent) for sent in report_cleaner(report) if sent_cleaner(sent) != []]
-        report = ' . '.join(tokens) + ' .'
-        return report
-
-    def clean_report_mimic_cxr(self, report):
-        report_cleaner = lambda t: t.replace('\n', ' ').replace('__', '_').replace('__', '_').replace('__', '_') \
-            .replace('__', '_').replace('__', '_').replace('__', '_').replace('__', '_').replace('  ', ' ') \
-            .replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ') \
-            .replace('..', '.').replace('..', '.').replace('..', '.').replace('..', '.').replace('..', '.') \
-            .replace('..', '.').replace('..', '.').replace('..', '.').replace('1. ', '').replace('. 2. ', '. ') \
-            .replace('. 3. ', '. ').replace('. 4. ', '. ').replace('. 5. ', '. ').replace(' 2. ', '. ') \
-            .replace(' 3. ', '. ').replace(' 4. ', '. ').replace(' 5. ', '. ') \
-            .strip().lower().split('. ')
-        sent_cleaner = lambda t: re.sub('[.,?;*!%^&_+():-\[\]{}]', '', t.replace('"', '').replace('/', '')
-                                        .replace('\\', '').replace("'", '').strip().lower())
-        tokens = [sent_cleaner(sent) for sent in report_cleaner(report) if sent_cleaner(sent) != []]
-        report = ' . '.join(tokens) + ' .'
-        return report
 
     def clean_report_fair(self, report):
         report_cleaner = lambda t: t.replace('\n', ' ').replace('__', '_').replace('__', '_').replace('__', '_') \
