@@ -14,11 +14,23 @@ class Tokenizer(object):
 
     def create_vocabulary(self):
         total_tokens = []
-
-        for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
-            tokens = self.clean_report_fair(report).split()
-            for token in tokens:
-                total_tokens.append(token)
+        total_tokens = []
+        if self.dataset_name != "FFA_IR":
+            for example in self.ann['train']:
+                tokens = self.clean_report(example['report']).split()
+                for token in tokens:
+                    total_tokens.append(token)
+        else:
+            for example in self.ann['train']:
+                tokens = self.clean_report_fair(self.ann['train'][example]['En_Report']).split()
+            # for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
+            #     tokens = self.clean_report_fair(report).split()
+                for token in tokens:
+                    total_tokens.append(token)
+        # for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
+        #     tokens = self.clean_report_fair(report).split()
+        #     for token in tokens:
+        #         total_tokens.append(token)
 
         counter = Counter(total_tokens)
         vocab = [k for k, v in counter.items() if v >= self.threshold] + ['<unk>']
