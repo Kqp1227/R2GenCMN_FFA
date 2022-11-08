@@ -224,7 +224,7 @@ class Trainer(BaseTrainer):
         self.writer = SummaryWriter()
 
     def _train_epoch(self, epoch):
-
+        print("start to train...")
         self.logger.info('[{}/{}] Start to train in the training set.'.format(epoch, self.epochs))
         train_loss = 0
         print_loss = 0

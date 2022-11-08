@@ -21,6 +21,7 @@ class Tokenizer(object):
                 for token in tokens:
                     total_tokens.append(token)
         else:
+            print("ann:", self.ann)
             for example in self.ann['train']:
                 tokens = self.clean_report_fair(self.ann['train'][example]['En_Report']).split()
             # for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
