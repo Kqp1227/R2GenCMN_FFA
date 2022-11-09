@@ -32,8 +32,8 @@ class Tokenizer(object):
         #     idx2token[idx + 1] = token
         # return token2idx, idx2token
         for example in self.ann['train']:
-            print("exam:", example)
-            print(self.ann['train'][example]['En_Report'])
+            # print("exam:", example)
+            # print(self.ann['train'][example]['En_Report'])
             tokens = self.clean_report(self.ann['train'][example]['En_Report']).split()
 
             for token in tokens:
@@ -49,7 +49,6 @@ class Tokenizer(object):
 
         print("token2idx: ",token2idx,"\nidx2token: ", idx2token,"\n")
         return token2idx, idx2token
-
 
     def clean_report_fair(self, report):
         report_cleaner = lambda t: t.replace('\n', ' ').replace('__', '_').replace('__', '_').replace('__', '_') \
