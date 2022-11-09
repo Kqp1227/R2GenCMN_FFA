@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+import json
 from collections import Counter
 
 
@@ -9,29 +10,34 @@ class Tokenizer(object):
         self.threshold = args.threshold
         self.dataset_name = args.dataset_name
         self.clean_report = self.clean_report_fair
-        self.ann = pd.read_csv(self.ann_path)
+        # self.ann = pd.read_csv(self.ann_path)
+        self.ann = json.loads(open(self.ann_path, 'r').read())
         self.token2idx, self.idx2token = self.create_vocabulary()
 
     def create_vocabulary(self):
         total_tokens = []
-        total_tokens = []
-        if self.dataset_name != "FFA_IR":
-            for example in self.ann['train']:
-                tokens = self.clean_report(example['report']).split()
-                for token in tokens:
-                    total_tokens.append(token)
-        else:
-            print("ann:", self.ann)
-            for example in self.ann['train']:
-                tokens = self.clean_report_fair(self.ann['train'][example]['En_Report']).split()
-            # for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
-            #     tokens = self.clean_report_fair(report).split()
-                for token in tokens:
-                    total_tokens.append(token)
+        # print("split:", self.ann['train']['En_Report'])
+        #
         # for report in self.ann.loc[self.ann['Split'] == 'train', 'En_Report']:
         #     tokens = self.clean_report_fair(report).split()
         #     for token in tokens:
         #         total_tokens.append(token)
+        #
+        # counter = Counter(total_tokens)
+        # vocab = [k for k, v in counter.items() if v >= self.threshold] + ['<unk>']
+        # vocab.sort()
+        # token2idx, idx2token = {}, {}
+        # for idx, token in enumerate(vocab):
+        #     token2idx[token] = idx + 1
+        #     idx2token[idx + 1] = token
+        # return token2idx, idx2token
+        for example in self.ann['train']:
+            print("exam:", example)
+            print(self.ann['train'][example]['En_Report'])
+            tokens = self.clean_report(self.ann['train'][example]['En_Report']).split()
+
+            for token in tokens:
+                total_tokens.append(token)
 
         counter = Counter(total_tokens)
         vocab = [k for k, v in counter.items() if v >= self.threshold] + ['<unk>']
@@ -40,7 +46,10 @@ class Tokenizer(object):
         for idx, token in enumerate(vocab):
             token2idx[token] = idx + 1
             idx2token[idx + 1] = token
+
+        print("token2idx: ",token2idx,"\nidx2token: ", idx2token,"\n")
         return token2idx, idx2token
+
 
     def clean_report_fair(self, report):
         report_cleaner = lambda t: t.replace('\n', ' ').replace('__', '_').replace('__', '_').replace('__', '_') \
