@@ -109,7 +109,6 @@ def main():
 
     # create tokenizer
     tokenizer = Tokenizer(args)
-    print("token finish!")
     # create data loader
     train_dataloader = FFAIRDataLoader(args, tokenizer, split='train', shuffle=True)
     val_dataloader = FFAIRDataLoader(args, tokenizer, split='val', shuffle=False)
